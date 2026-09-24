@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Juego de Dados & Retos Multijugador Online</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Fonts: Inter & Outfit -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;700;800&display=swap" rel="stylesheet">
+  
+  <script>
+    window.tailwind = window.tailwind || {};
+    window.tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            heading: ['Outfit', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              purple: '#8b5cf6',
+              pink: '#ec4899',
+              cyan: '#06b6d4',
+              dark: '#0f172a',
+              card: 'rgba(30, 41, 59, 0.7)',
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    body {
+      background: radial-gradient(circle at top left, #1e1b4b, #0f172a 60%, #020617);
+      color: #f8fafc;
+      min-height: 100vh;
+      font-family: 'Inter', sans-serif;
+    }
+
+    /* Glassmorphism Styles */
+    .glass-card {
+      background: rgba(30, 41, 59, 0.65);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+    }
+
+    .glass-input {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #fff;
+    }
+
+    .glass-input:focus {
+      border-color: #8b5cf6;
+      outline: none;
+      box-shadow: 0 0 15px rgba(139, 92, 246, 0.3);
+    }
+
+    /* 3D Dice styling */
+    .dice-scene {
+      perspective: 800px;
+      width: 80px;
+      height: 80px;
+    }
+
+    @media (min-width: 640px) {
+      .dice-scene {
+        width: 90px;
+        height: 90px;
+      }
+    }
+
+    .cube {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform 1.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .cube-face {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #ffffff, #e2e8f0);
+      border-radius: 16px;
+      border: 2px solid #cbd5e1;
+      display: grid;
+      grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+      padding: 10px;
+      box-shadow: inset 0 0 10px rgba(0,0,0,0.15), 0 4px 10px rgba(0,0,0,0.3);
+    }
+
+    .pip {
+      display: block;
+      align-self: center;
+      justify-self: center;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background-color: #0f172a;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.6);
+    }
+
+    /* Positioning Cubes Faces */
+    .face-1 { transform: rotateY(  0deg) translateZ(40px); }
+    .face-2 { transform: rotateY( 90deg) translateZ(40px); }
+    .face-3 { transform: rotateY(180deg) translateZ(40px); }
+    .face-4 { transform: rotateY(-90deg) translateZ(40px); }
+    .face-5 { transform: rotateX( 90deg) translateZ(40px); }
+    .face-6 { transform: rotateX(-90deg) translateZ(40px); }
+
+    @media (min-width: 640px) {
+      .face-1 { transform: rotateY(  0deg) translateZ(45px); }
+      .face-2 { transform: rotateY( 90deg) translateZ(45px); }
+      .face-3 { transform: rotateY(180deg) translateZ(45px); }
+      .face-4 { transform: rotateY(-90deg) translateZ(45px); }
+      .face-5 { transform: rotateX( 90deg) translateZ(45px); }
+      .face-6 { transform: rotateX(-90deg) translateZ(45px); }
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.5);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(139, 92, 246, 0.4);
+      border-radius: 3px;
+    }
+
+    /* Glow Animations */
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 15px rgba(139, 92, 246, 0.4); }
+      50% { box-shadow: 0 0 30px rgba(236, 72, 153, 0.7); }
+    }
+
+    .glow-active {
+      animation: pulseGlow 2s infinite;
+    }
+  </style>
+</head>
+<body class="p-3 md:p-6 flex flex-col justify-between min-h-screen">
+
+  <header class="max-w-5xl mx-auto w-full flex flex-col sm:flex-row justify-between items-center gap-4 mb-6 py-3 px-4 glass-card rounded-2xl">
+    <div class="flex items-center space-x-3 w-full sm:w-auto justify-between sm:justify-start">
+      <div class="flex items-center space-x-3">
+        <div class="bg-gradient-to-tr from-purple-600 to-pink-500 p-3 rounded-xl shadow-lg">
+          <i class="fa-solid fa-dice-d6 text-2xl text-white"></i>
+        </div>
+        <div>
+          <h1 class="font-heading font-bold text-xl md:text-2xl bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400">
+            RetoDados Duo 🎲
+          </h1>
+          <p id="roomStatusTag" class="text-xs text-slate-400 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-amber-400"></span> Modo Local (Mismo teléfono)
+          </p>
+        </div>
+      </div>
+      
+      <!-- Quick Mobile Online Badge -->
+      <button onclick="toggleModal('roomModal')" class="sm:hidden px-3 py-1.5 text-xs font-semibold bg-purple-600/30 text-purple-300 border border-purple-500/40 rounded-xl">
+        <i class="fa-solid fa-wifi mr-1"></i> Sala
+      </button>
+    </div>
+
+    <!-- Top Action Buttons -->
+    <div class="flex items-center space-x-2 w-full sm:w-auto justify-end">
+      <button onclick="toggleModal('roomModal')" class="hidden sm:flex px-3.5 py-2 text-xs md:text-sm font-medium bg-purple-900/50 hover:bg-purple-800/70 text-purple-200 border border-purple-500/40 rounded-xl transition items-center gap-2">
+        <i class="fa-solid fa-tower-broadcast text-pink-400"></i>
+        <span id="roomBtnLabel">Conectar Teléfonos</span>
+      </button>
+      <button onclick="toggleModal('challengesModal')" class="px-3 py-2 text-xs md:text-sm font-medium bg-slate-800/80 hover:bg-purple-900/40 text-purple-300 border border-purple-500/30 rounded-xl transition flex items-center gap-2">
+        <i class="fa-solid fa-sliders"></i>
+        <span class="hidden sm:inline">Retos</span>
+      </button>
+      <button onclick="resetWholeGame()" class="px-3 py-2 text-xs md:text-sm font-medium bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-500/30 rounded-xl transition flex items-center gap-2">
+        <i class="fa-solid fa-rotate-right"></i>
+        <span class="hidden sm:inline">Reiniciar</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Room Code Banner (Visible when connected online) -->
+  <div id="activeRoomBanner" class="max-w-5xl mx-auto w-full mb-4 hidden">
+    <div class="bg-gradient-to-r from-purple-900/80 via-slate-900/90 to-pink-900/80 border border-purple-500/40 rounded-2xl p-3 px-5 flex justify-between items-center shadow-lg flex-wrap gap-2">
+      <div class="flex items-center gap-3">
+        <span class="w-3 h-3 rounded-full bg-emerald-400 animate-pulse"></span>
+        <div>
+          <p class="text-xs text-slate-400">Online por Internet (Funciona a cualquier distancia)</p>
+          <p class="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
+            Código de Sala: <span id="currentRoomCode" class="font-mono text-cyan-300 text-base bg-slate-950 px-2 py-0.5 rounded border border-slate-700">----</span>
+          </p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <button onclick="shareWhatsApp()" class="px-3 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition flex items-center gap-1.5 shadow">
+          <i class="fa-brands fa-whatsapp text-sm"></i>
+          <span>Enviar por WhatsApp</span>
+        </button>
+        <button onclick="copyRoomCode()" class="px-3 py-1.5 text-xs font-semibold bg-cyan-950 hover:bg-cyan-900 text-cyan-300 border border-cyan-500/30 rounded-xl transition flex items-center gap-1.5">
+          <i class="fa-regular fa-copy"></i>
+          <span>Copiar</span>
+        </button>
+        <button onclick="leaveRoom()" class="px-3 py-1.5 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition">
+          Salir
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <main class="max-w-5xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-6 items-start flex-grow">
+
+    <!-- LEFT COLUMN: Player Status & Roll Controller (7 cols) -->
+    <section class="lg:col-span-7 flex flex-col gap-6">
+
+      <!-- Active Players Status Cards -->
+      <div class="grid grid-cols-2 gap-4">
+        <!-- Player 1 Card -->
+        <div id="p1Card" class="glass-card p-4 rounded-2xl border-2 transition-all duration-300 border-purple-500/80 bg-purple-950/20 glow-active">
+          <div class="flex justify-between items-start mb-2">
+            <span id="p1RoleTag" class="text-xs font-semibold px-2 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">Jugador 1</span>
+            <button onclick="editPlayerName(1)" class="text-slate-400 hover:text-white text-xs"><i class="fa-solid fa-pencil"></i></button>
+          </div>
+          <h2 id="p1NameDisplay" class="font-heading font-bold text-lg md:text-xl text-white truncate">Jugador 1</h2>
+          <div class="mt-3 flex items-center justify-between text-xs text-slate-400">
+            <span>Tiradas: <strong id="p1Rolls" class="text-purple-300">0</strong></span>
+            <span id="p1StatusBadge" class="text-emerald-400 font-medium flex items-center gap-1">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Turno Actual
+            </span>
+          </div>
+        </div>
+
+        <!-- Player 2 Card -->
+        <div id="p2Card" class="glass-card p-4 rounded-2xl border-2 transition-all duration-300 border-transparent opacity-75">
+          <div class="flex justify-between items-start mb-2">
+            <span id="p2RoleTag" class="text-xs font-semibold px-2 py-1 rounded-full bg-pink-500/20 text-pink-300 border border-pink-500/30">Jugador 2</span>
+            <button onclick="editPlayerName(2)" class="text-slate-400 hover:text-white text-xs"><i class="fa-solid fa-pencil"></i></button>
+          </div>
+          <h2 id="p2NameDisplay" class="font-heading font-bold text-lg md:text-xl text-white truncate">Jugador 2</h2>
+          <div class="mt-3 flex items-center justify-between text-xs text-slate-400">
+            <span>Tiradas: <strong id="p2Rolls" class="text-pink-300">0</strong></span>
+            <span id="p2StatusBadge" class="text-slate-500 hidden flex items-center gap-1">
+              Esperando...
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Turn & Dice Roll Container -->
+      <div class="glass-card p-6 rounded-3xl text-center relative overflow-hidden flex flex-col items-center">
+        
+        <!-- Turn Alert Header -->
+        <div class="mb-4">
+          <p class="text-xs uppercase tracking-widest text-slate-400 font-semibold mb-1">Ronda <span id="currentRoundDisplay">1</span> / 5</p>
+          <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-800/90 border border-slate-700 text-sm font-medium">
+            <span id="turnNoticePrefix">Es el turno de:</span>
+            <span id="activePlayerName" class="font-bold font-heading text-purple-400 text-base">Jugador 1</span>
+          </div>
+        </div>
+
+        <!-- 3D Interactive Dice Displays -->
+        <div class="flex justify-center items-center gap-6 sm:gap-8 my-6">
+          <!-- Die 1 -->
+          <div class="dice-scene">
+            <div id="cube1" class="cube">
+              <div class="cube-face face-1"><span class="pip" style="grid-area: 2/2"></span></div>
+              <div class="cube-face face-2"><span class="pip" style="grid-area: 1/1"></span><span class="pip" style="grid-area: 3/3"></span></div>
+              <div class="cube-face face-3"><span class="pip" style="grid-area: 1/1"></span><span class="pip" style="grid-area: 2/2"></span><span class="pip" style="grid-area: 3/3"></span></div>
+              <div class="cube-face face-4"><span class="pip" style="grid-area: 1/1"></span><span class="pip" style="grid-area: 1/3"></span><span class="pip" style="grid-area: 3/1"></span><span class="pip" style="grid-area: 3/3"></span></div>
+              <div class="cube-face face-5"><span class="pip" style="grid-area: 1/1"></span><span class="pip" style="grid-area: 1/3"></span><span class="pip" style="grid-area: 2/2"></span><span class="pip" style="grid-area: 3/1"></span><span class="pip" style="grid-area: 3/3"></span></div>
+              <div class="cube-face face-6"><span class="pip" style="grid-area: 1/1"></span><span class="pip" style="grid-area: 1/3"></span><span class="pip" style="grid-area: 2/1"></span><span class="pip" style="grid-area: 2/3"></span><span class="pip" style="grid-area: 3/1"></span><span class="pip" style="grid-area: 3/3"></span></div>
+            </div>
+          </div>
+
+          <div class="text-2xl font-bold text-slate-500">+</div>
+
+          <!-- Die 2 -->
+          <div class="dice-scene">
+            <div id="cube2" class="cube">
+              <div class="cube-face face-1"><span class="pip" style="grid-area: 2/2"></span></div>
+              <div class="cube-face face-2"><span class="pip" style="grid-area: 1/1"></span><span class="pip" style="grid-area: 3/3"></span></div>
+              <div class="cube-face face-3"><span class="pip" style="grid-area: 1/1"></span><span class="pip" style="grid-area: 2/2"></span><span class="pip" style="grid-area: 3/3"></span></div>
+              <div class="cube-face face-4"><span class="pip" style="grid-area: 1/1"></span><span class="pip" style="grid-area: 1/3"></span><span class="pip" style="grid-area: 3/1"></span><span class="pip" style="grid-area: 3/3"></span></div>
+              <div class="cube-face face-5"><span class="pip" style="grid-area: 1/1"></span><span class="pip" style="grid-area: 1/3"></span><span class="pip" style="grid-area: 2/2"></span><span class="pip" style="grid-area: 3/1"></span><span class="pip" style="grid-area: 3/3"></span></div>
+              <div class="cube-face face-6"><span class="pip" style="grid-area: 1/1"></span><span class="pip" style="grid-area: 1/3"></span><span class="pip" style="grid-area: 2/1"></span><span class="pip" style="grid-area: 2/3"></span><span class="pip" style="grid-area: 3/1"></span><span class="pip" style="grid-area: 3/3"></span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dynamic Control Button -->
+        <div class="w-full max-w-md mt-2 flex flex-col gap-3">
+          <button id="rollBtn" onclick="rollDice()" class="w-full py-4 px-6 rounded-2xl font-heading font-bold text-lg bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-500 hover:from-purple-500 hover:to-cyan-400 text-white shadow-lg shadow-purple-500/25 active:scale-95 transition transform duration-150 flex items-center justify-center gap-2">
+            <i class="fa-solid fa-dice"></i>
+            <span id="rollBtnText">¡Tirar Dados!</span>
+          </button>
+          
+          <p id="turnStatusSubtext" class="text-xs text-slate-400 italic">
+            Haz clic para lanzar los dados en tu turno.
+          </p>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- RIGHT COLUMN: Shared Last Roll & Match History (5 cols) -->
+    <section class="lg:col-span-5 flex flex-col gap-6">
+
+      <!-- Featured Last Roll Card (Shared View across both phones) -->
+      <div class="glass-card p-5 rounded-3xl border-l-4 border-l-pink-500 relative overflow-hidden">
+        <div class="flex justify-between items-center mb-3 border-b border-slate-700/60 pb-2">
+          <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+            <i class="fa-solid fa-eye text-pink-400"></i> Último Resultado Sincronizado
+          </span>
+          <span id="lastTime" class="text-xs text-slate-500">Sin lanzamientos</span>
+        </div>
+
+        <div id="lastRollContent" class="text-center py-4">
+          <p class="text-sm text-slate-400 italic">Los dados están listos. El jugador activo debe hacer clic en "¡Tirar Dados!".</p>
+        </div>
+      </div>
+
+      <!-- Full Turn History Log -->
+      <div class="glass-card p-5 rounded-3xl flex-grow flex flex-col max-h-[380px]">
+        <div class="flex justify-between items-center mb-3 pb-2 border-b border-slate-700/60">
+          <h3 class="font-heading font-bold text-sm text-slate-300 uppercase tracking-wider flex items-center gap-2">
+            <i class="fa-solid fa-clock-rotate-left text-purple-400"></i> Historial de Rondas
+          </h3>
+          <span id="totalRollsBadge" class="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-mono">0 turnos</span>
+        </div>
+
+        <div id="historyList" class="overflow-y-auto space-y-2.5 pr-1 flex-grow">
+          <!-- Empty State -->
+          <div id="emptyHistory" class="text-center py-8 text-slate-500 text-xs">
+            Aún no hay lanzamientos registrados en esta partida.
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- MODAL 1: Online Room Multiplayer Connection -->
+  <div id="roomModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+    <div class="glass-card w-full max-w-md rounded-3xl p-6 shadow-2xl border border-purple-500/30 flex flex-col gap-5">
+      
+      <div class="flex justify-between items-center border-b border-slate-700 pb-3">
+        <div class="flex items-center gap-3">
+          <div class="p-2.5 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/30">
+            <i class="fa-solid fa-tower-broadcast text-xl"></i>
+          </div>
+          <div>
+            <h3 class="font-heading font-bold text-lg text-white">Jugar en 2 Teléfonos</h3>
+            <p class="text-xs text-slate-400">Sincroniza el juego en tiempo real</p>
+          </div>
+        </div>
+        <button onclick="toggleModal('roomModal')" class="text-slate-400 hover:text-white p-2">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Option A: Create New Room -->
+      <div class="bg-slate-900/80 p-4 rounded-2xl border border-purple-500/30 flex flex-col gap-2">
+        <h4 class="text-sm font-bold text-purple-300 flex items-center gap-2">
+          <i class="fa-solid fa-plus-circle"></i> Opción 1: Crear una Sala
+        </h4>
+        <p class="text-xs text-slate-400">Crea una sala y envíale el código a tu amigo por WhatsApp (funciona a cualquier distancia por Internet).</p>
+        <button onclick="createOnlineRoom()" class="mt-2 py-2.5 px-4 rounded-xl font-bold text-xs bg-purple-600 hover:bg-purple-500 text-white transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-wand-magic-sparkles"></i> Crear Nueva Sala
+        </button>
+      </div>
+
+      <!-- Option B: Join Existing Room -->
+      <div class="bg-slate-900/80 p-4 rounded-2xl border border-pink-500/30 flex flex-col gap-3">
+        <h4 class="text-sm font-bold text-pink-300 flex items-center gap-2">
+          <i class="fa-solid fa-right-to-bracket"></i> Opción 2: Unirte con un Código
+        </h4>
+        <p class="text-xs text-slate-400">Ingresa el código que te envió tu amigo desde su teléfono.</p>
+        
+        <div class="flex gap-2">
+          <input type="text" id="joinRoomCodeInput" maxlength="6" class="uppercase text-center font-mono font-bold tracking-widest text-base w-full px-3 py-2 rounded-xl glass-input" placeholder="CÓDIGO">
+          <button onclick="joinOnlineRoom()" class="py-2 px-5 rounded-xl font-bold text-xs bg-pink-600 hover:bg-pink-500 text-white transition shrink-0">
+            Unirme
+          </button>
+        </div>
+      </div>
+
+      <p class="text-[11px] text-slate-500 text-center">
+        Nota: Si juegan en el mismo teléfono, no necesitas crear ninguna sala.
+      </p>
+
+    </div>
+  </div>
+
+  <!-- MODAL 2: Challenges Configuration List -->
+  <div id="challengesModal" class="fixed inset-0 bg-black/75 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+    <div class="glass-card w-full max-w-2xl rounded-3xl p-6 max-h-[90vh] flex flex-col shadow-2xl border border-purple-500/30">
+      
+      <div class="flex justify-between items-center pb-4 border-b border-slate-700">
+        <div class="flex items-center gap-3">
+          <div class="p-2.5 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/30">
+            <i class="fa-solid fa-sliders"></i>
+          </div>
+          <div>
+            <h3 class="font-heading font-bold text-lg text-white">Configurar Lista de Retos</h3>
+            <p class="text-xs text-slate-400">Personaliza los retos asignados a cada suma (2 al 12)</p>
+          </div>
+        </div>
+        <button onclick="toggleModal('challengesModal')" class="text-slate-400 hover:text-white p-2 text-xl">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Challenge List Editor -->
+      <div class="overflow-y-auto py-4 space-y-3 flex-grow pr-2" id="challengesEditorList">
+        <!-- Javascript dynamic inputs 2..12 -->
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="pt-4 border-t border-slate-700 flex justify-between items-center gap-3">
+        <button onclick="restoreDefaultChallenges()" class="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition">
+          Restaurar
+        </button>
+        <div class="flex gap-2">
+          <button onclick="toggleModal('challengesModal')" class="px-4 py-2 rounded-xl text-xs font-medium bg-slate-800 text-slate-300 hover:bg-slate-700 transition">
+            Cancelar
+          </button>
+          <button onclick="saveCustomChallenges()" class="px-5 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white transition shadow-lg shadow-purple-600/30">
+            Guardar Cambios
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODAL 3: Player Name Edit -->
+  <div id="nameModal" class="fixed inset-0 bg-black/75 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+    <div class="glass-card w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-purple-500/30">
+      <h3 class="font-heading font-bold text-lg text-white mb-1">Cambiar Nombre</h3>
+      <p class="text-xs text-slate-400 mb-4">Ingresa tu nombre para mostrar en la partida</p>
+      
+      <input type="text" id="playerNameInput" maxlength="18" class="w-full px-4 py-3 rounded-xl glass-input mb-4 text-sm font-medium" placeholder="Nombre del jugador">
+      
+      <div class="flex justify-end gap-2">
+        <button onclick="toggleModal('nameModal')" class="px-4 py-2 rounded-xl text-xs font-medium bg-slate-800 text-slate-300 hover:bg-slate-700 transition">
+          Cancelar
+        </button>
+        <button onclick="savePlayerName()" class="px-5 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white transition">
+          Guardar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Bar -->
+  <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 hidden bg-slate-900 border border-purple-500 text-white text-xs px-4 py-2.5 rounded-2xl shadow-xl flex items-center gap-2">
+    <i class="fa-solid fa-circle-info text-cyan-400"></i>
+    <span id="toastMsg">Notificación</span>
+  </div>
+
+  <!-- Firebase SDK Imports -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    /* Default Challenges Configuration (2 to 12) */
+    const DEFAULT_CHALLENGES = {
+      2: "¡Doble Uno! Haz un baile divertido sin música por 20 segundos.",
+      3: "Cuéntale a tu compañero un secreto divertido o tu mayor vergüenza del año.",
+      4: "Haz 10 sentadillas o saltos mientras cantas el coro de una canción conocida.",
+      5: "Imita la voz o forma de hablar de un personaje famoso hasta tu siguiente turno.",
+      6: "Envía un sticker o mensaje gracioso a un grupo de chat que elijas.",
+      7: "Habla en rima durante las siguientes 2 rondas sin romper el personaje.",
+      8: "Deja que el otro jugador elija un apodo gracioso para ti durante la partida.",
+      9: "Haz una pose dramática de modelo y mantén la cara seria durante 10 segundos.",
+      10: "Menciona 5 países del mundo en menos de 5 segundos.",
+      11: "Intenta hacer sonreír al otro jugador con muecas o chistes sin tocarlo.",
+      12: "¡Doble Seis! Tienes inmunidad o puedes obligar al otro jugador a repetir su turno."
+    };
+
+    // Firebase App Configuration
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'dice-game-room-app';
+    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+      apiKey: "AIzaSyDemoKeyOnly1234567890",
+      authDomain: "demo-app.firebaseapp.com",
+      projectId: "demo-app",
+      storageBucket: "demo-app.appspot.com",
+      messagingSenderId: "1234567890",
+      appId: "1:1234567890:web:1234567890"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // Local Game State
+    window.customChallenges = { ...DEFAULT_CHALLENGES };
+    window.players = {
+      1: { name: "Jugador 1", rolls: 0 },
+      2: { name: "Jugador 2", rolls: 0 }
+    };
+    window.activePlayer = 1;
+    window.roundCount = 1;
+    window.gameHistory = [];
+    window.isRolling = false;
+    window.editingPlayerId = null;
+
+    // Online Multiplayer Room State
+    window.currentRoomCode = null;
+    window.myPlayerNum = null; // 1 = Host, 2 = Guest, null = Local Mode
+    window.unsubscribeRoomListener = null;
+
+    // Dice 3D rotation map according to top face value
+    const cubeRotations = {
+      1: { x: 0, y: 0 },
+      2: { x: 0, y: -90 },
+      3: { x: 0, y: -180 },
+      4: { x: 0, y: 90 },
+      5: { x: -90, y: 0 },
+      6: { x: 90, y: 0 }
+    };
+
+    // Authenticate user anonymously or with custom token on load
+    async function initAuth() {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (err) {
+        console.warn("Auth initialization fallback:", err);
+      }
+    }
+
+    window.onload = function() {
+      initAuth();
+      updatePlayersUI();
+      renderChallengesEditor();
+    };
+
+    /* Toast Notification Utility */
+    window.showToast = function(msg) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toastMsg').textContent = msg;
+      toast.classList.remove('hidden');
+      setTimeout(() => toast.classList.add('hidden'), 3000);
+    };
+
+    /* Toggle Modal Dialogs */
+    window.toggleModal = function(modalId) {
+      const modal = document.getElementById(modalId);
+      if (modal) {
+        modal.classList.toggle('hidden');
+      }
+    };
+
+    /* Copy Room Code to Clipboard */
+    window.copyRoomCode = function() {
+      if (!window.currentRoomCode) return;
+      const textToCopy = window.currentRoomCode;
+      
+      const tempInput = document.createElement("input");
+      tempInput.value = textToCopy;
+      document.body.appendChild(tempInput);
+      tempInput.select();
+      document.execCommand("copy");
+      document.body.removeChild(tempInput);
+
+      showToast("¡Código copiado al portapapeles: " + window.currentRoomCode + "!");
+    };
+
+    /* Share Room Code via WhatsApp */
+    window.shareWhatsApp = function() {
+      if (!window.currentRoomCode) return;
+      const message = `¡Entra a jugar a los dados conmigo! 🎲\n\nEl código de sala es: *${window.currentRoomCode}*`;
+      const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
+      window.open(url, '_blank');
+    };
+
+    /* Update Player Names & UI Statuses */
+    window.updatePlayersUI = function() {
+      document.getElementById('p1NameDisplay').textContent = window.players[1].name;
+      document.getElementById('p2NameDisplay').textContent = window.players[2].name;
+      
+      const activeName = window.players[window.activePlayer].name;
+      document.getElementById('activePlayerName').textContent = activeName;
+      document.getElementById('activePlayerName').className = `font-bold font-heading text-base ${window.activePlayer === 1 ? 'text-purple-400' : 'text-pink-400'}`;
+
+      // Card active highlight
+      const p1Card = document.getElementById('p1Card');
+      const p2Card = document.getElementById('p2Card');
+      const p1Status = document.getElementById('p1StatusBadge');
+      const p2Status = document.getElementById('p2StatusBadge');
+
+      if (window.activePlayer === 1) {
+        p1Card.className = "glass-card p-4 rounded-2xl border-2 transition-all duration-300 border-purple-500/80 bg-purple-950/20 glow-active";
+        p2Card.className = "glass-card p-4 rounded-2xl border-2 transition-all duration-300 border-transparent opacity-70";
+        p1Status.className = "text-emerald-400 font-medium flex items-center gap-1";
+        p1Status.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Turno Actual';
+        p2Status.className = "text-slate-500 hidden flex items-center gap-1";
+      } else {
+        p2Card.className = "glass-card p-4 rounded-2xl border-2 transition-all duration-300 border-pink-500/80 bg-pink-950/20 glow-active";
+        p1Card.className = "glass-card p-4 rounded-2xl border-2 transition-all duration-300 border-transparent opacity-70";
+        p2Status.className = "text-emerald-400 font-medium flex items-center gap-1";
+        p2Status.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Turno Actual';
+        p1Status.className = "text-slate-500 hidden flex items-center gap-1";
+      }
+
+      // Role Labels (Player 1 / Player 2 / You)
+      const p1Role = document.getElementById('p1RoleTag');
+      const p2Role = document.getElementById('p2RoleTag');
+
+      if (window.myPlayerNum === 1) {
+        p1Role.textContent = "Jugador 1 (Tú)";
+        p2Role.textContent = "Jugador 2";
+      } else if (window.myPlayerNum === 2) {
+        p1Role.textContent = "Jugador 1";
+        p2Role.textContent = "Jugador 2 (Tú)";
+      } else {
+        p1Role.textContent = "Jugador 1";
+        p2Role.textContent = "Jugador 2";
+      }
+
+      document.getElementById('p1Rolls').textContent = window.players[1].rolls;
+      document.getElementById('p2Rolls').textContent = window.players[2].rolls;
+      document.getElementById('currentRoundDisplay').textContent = window.roundCount;
+
+      // Disable/Enable Roll Button based on turn ownership
+      const rollBtn = document.getElementById('rollBtn');
+      const rollBtnText = document.getElementById('rollBtnText');
+      const subtext = document.getElementById('turnStatusSubtext');
+
+      if (window.myPlayerNum !== null) {
+        // Online mode active
+        if (window.activePlayer === window.myPlayerNum) {
+          rollBtn.disabled = window.isRolling;
+          rollBtn.className = "w-full py-4 px-6 rounded-2xl font-heading font-bold text-lg bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-500 hover:from-purple-500 hover:to-cyan-400 text-white shadow-lg shadow-purple-500/25 active:scale-95 transition transform duration-150 flex items-center justify-center gap-2 cursor-pointer";
+          rollBtnText.textContent = "¡Tirar Dados!";
+          subtext.textContent = "¡Es tu turno! Toca para tirar los dados.";
+        } else {
+          rollBtn.disabled = true;
+          rollBtn.className = "w-full py-4 px-6 rounded-2xl font-heading font-bold text-lg bg-slate-800 text-slate-500 opacity-60 cursor-not-allowed flex items-center justify-center gap-2";
+          rollBtnText.textContent = `Esperando a ${activeName}...`;
+          subtext.textContent = `Turno de ${activeName} en su teléfono...`;
+        }
+      } else {
+        // Local mode
+        rollBtn.disabled = window.isRolling;
+        rollBtn.className = "w-full py-4 px-6 rounded-2xl font-heading font-bold text-lg bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-500 hover:from-purple-500 hover:to-cyan-400 text-white shadow-lg shadow-purple-500/25 active:scale-95 transition transform duration-150 flex items-center justify-center gap-2 cursor-pointer";
+        rollBtnText.textContent = "¡Tirar Dados!";
+        subtext.textContent = "Modo local: Turnos compartidos en el mismo teléfono.";
+      }
+    };
+
+    /* Edit Player Name */
+    window.editPlayerName = function(id) {
+      if (window.myPlayerNum !== null && window.myPlayerNum !== id) {
+        showToast("Solo puedes cambiar tu propio nombre en modo online.");
+        return;
+      }
+      window.editingPlayerId = id;
+      document.getElementById('playerNameInput').value = window.players[id].name;
+      toggleModal('nameModal');
+      setTimeout(() => document.getElementById('playerNameInput').focus(), 100);
+    };
+
+    /* Save Player Name */
+    window.savePlayerName = async function() {
+      const val = document.getElementById('playerNameInput').value.trim();
+      if (val && window.editingPlayerId) {
+        window.players[window.editingPlayerId].name = val;
+        updatePlayersUI();
+
+        // Sync with Firestore if in room
+        if (window.currentRoomCode) {
+          try {
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'diceRooms', window.currentRoomCode);
+            await updateDoc(roomRef, {
+              [`p${window.editingPlayerId}.name`]: val
+            });
+          } catch(e) {
+            console.error("Error updating online player name:", e);
+          }
+        }
+      }
+      toggleModal('nameModal');
+    };
+
+    /* Main Roll Function */
+    window.rollDice = async function() {
+      if (window.isRolling) return;
+
+      // Online turn check
+      if (window.myPlayerNum !== null && window.activePlayer !== window.myPlayerNum) {
+        showToast("Es el turno del otro jugador.");
+        return;
+      }
+
+      window.isRolling = true;
+      updatePlayersUI();
+
+      // Generate random dice numbers (1-6)
+      const val1 = Math.floor(Math.random() * 6) + 1;
+      const val2 = Math.floor(Math.random() * 6) + 1;
+      const totalSum = val1 + val2;
+      const challengeText = window.customChallenges[totalSum] || "Sin reto asignado.";
+      const timeFormatted = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+      const currentRollingPlayer = window.activePlayer;
+      const currentRollingName = window.players[currentRollingPlayer].name;
+
+      // Create turn record object
+      const newRecord = {
+        playerNum: currentRollingPlayer,
+        playerName: currentRollingName,
+        val1: val1,
+        val2: val2,
+        sum: totalSum,
+        challenge: challengeText,
+        time: timeFormatted,
+        round: window.roundCount
+      };
+
+      // Calculate next turn & round
+      const nextActivePlayer = currentRollingPlayer === 1 ? 2 : 1;
+      const nextRound = nextActivePlayer === 1 ? window.roundCount + 1 : window.roundCount;
+
+      if (window.currentRoomCode) {
+        // Sync online room turn to Firestore
+        try {
+          const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'diceRooms', window.currentRoomCode);
+          const updatedHistory = [newRecord, ...window.gameHistory];
+
+          await updateDoc(roomRef, {
+            val1: val1,
+            val2: val2,
+            lastRoll: newRecord,
+            activePlayer: nextActivePlayer,
+            round: nextRound,
+            history: updatedHistory,
+            [`p${currentRollingPlayer}.rolls`]: window.players[currentRollingPlayer].rolls + 1,
+            lastTrigger: Date.now()
+          });
+        } catch (err) {
+          console.error("Error syncing roll to room:", err);
+          showToast("Error al sincronizar el tiro online.");
+          window.isRolling = false;
+          updatePlayersUI();
+        }
+      } else {
+        // Local mode play
+        trigger3DDiceAnimation(val1, val2, () => {
+          window.players[currentRollingPlayer].rolls++;
+          window.gameHistory.unshift(newRecord);
+          window.activePlayer = nextActivePlayer;
+          window.roundCount = nextRound;
+
+          renderLastRollCard(newRecord);
+          renderHistoryList();
+
+          window.isRolling = false;
+          updatePlayersUI();
+        });
+      }
+    };
+
+    /* 3D Dice Spin Animation Trigger */
+    function trigger3DDiceAnimation(val1, val2, onComplete) {
+      const cube1 = document.getElementById('cube1');
+      const cube2 = document.getElementById('cube2');
+
+      const extraX1 = (Math.floor(Math.random() * 3) + 4) * 360;
+      const extraY1 = (Math.floor(Math.random() * 3) + 4) * 360;
+      const extraX2 = (Math.floor(Math.random() * 3) + 4) * 360;
+      const extraY2 = (Math.floor(Math.random() * 3) + 4) * 360;
+
+      const rot1 = cubeRotations[val1];
+      const rot2 = cubeRotations[val2];
+
+      cube1.style.transform = `rotateX(${rot1.x + extraX1}deg) rotateY(${rot1.y + extraY1}deg)`;
+      cube2.style.transform = `rotateX(${rot2.x + extraX2}deg) rotateY(${rot2.y + extraY2}deg)`;
+
+      setTimeout(() => {
+        if (onComplete) onComplete();
+      }, 1250);
+    }
+
+    /* Render Shared Last Roll View */
+    function renderLastRollCard(record) {
+      const container = document.getElementById('lastRollContent');
+      document.getElementById('lastTime').textContent = record.time;
+
+      const badgeBg = record.playerNum === 1 ? 'bg-purple-500/20 text-purple-300 border-purple-500/30' : 'bg-pink-500/20 text-pink-300 border-pink-500/30';
+
+      container.innerHTML = `
+        <div class="flex items-center justify-between mb-3 px-2">
+          <div class="flex items-center gap-2">
+            <span class="text-xs px-2.5 py-0.5 rounded-full font-semibold border ${badgeBg}">${record.playerName}</span>
+            <span class="text-xs text-slate-400">Ronda ${record.round}</span>
+          </div>
+          <div class="flex items-center gap-1 font-mono text-sm font-bold bg-slate-900/80 px-3 py-1 rounded-xl border border-slate-700">
+            <span class="text-slate-300">${record.val1} + ${record.val2} =</span>
+            <span class="text-cyan-400 text-base">${record.sum}</span>
+          </div>
+        </div>
+
+        <div class="bg-slate-900/90 p-4 rounded-2xl border border-slate-700/80 shadow-inner text-left">
+          <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+            <i class="fa-solid fa-bullseye text-pink-400"></i> Reto para ${record.playerName}:
+          </p>
+          <p class="text-base font-medium text-white leading-relaxed">
+            ${record.challenge}
+          </p>
+        </div>
+      `;
+    }
+
+    /* Render History Scrollable Log */
+    function renderHistoryList() {
+      const historyList = document.getElementById('historyList');
+      const totalBadge = document.getElementById('totalRollsBadge');
+      
+      totalBadge.textContent = `${window.gameHistory.length} turnos`;
+
+      if (window.gameHistory.length === 0) {
+        historyList.innerHTML = `<div id="emptyHistory" class="text-center py-8 text-slate-500 text-xs">Aún no hay lanzamientos registrados en esta partida.</div>`;
+        return;
+      }
+
+      historyList.innerHTML = window.gameHistory.map((item) => {
+        const isP1 = item.playerNum === 1;
+        const colorClass = isP1 ? 'border-l-purple-500 text-purple-300' : 'border-l-pink-500 text-pink-300';
+        
+        return `
+          <div class="bg-slate-900/70 p-3 rounded-xl border-l-4 ${colorClass} border-slate-800 text-xs transition hover:bg-slate-800/80">
+            <div class="flex justify-between items-center mb-1">
+              <span class="font-bold ${colorClass}">${item.playerName}</span>
+              <span class="text-[10px] text-slate-500 font-mono">${item.time}</span>
+            </div>
+            <div class="flex items-center justify-between gap-2 mb-1">
+              <span class="text-slate-300 font-medium line-clamp-1">${item.challenge}</span>
+              <span class="font-mono font-bold bg-slate-800 px-2 py-0.5 rounded text-cyan-300 border border-slate-700">${item.sum}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    /* Create Online Game Room */
+    window.createOnlineRoom = async function() {
+      try {
+        const roomCode = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit random code
+        const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'diceRooms', roomCode);
+
+        const initialRoomData = {
+          code: roomCode,
+          p1: { name: window.players[1].name, rolls: 0 },
+          p2: { name: "Jugador 2", rolls: 0 },
+          activePlayer: 1,
+          round: 1,
+          lastRoll: null,
+          history: [],
+          customChallenges: window.customChallenges,
+          lastTrigger: Date.now()
+        };
+
+        await setDoc(roomRef, initialRoomData);
+
+        window.currentRoomCode = roomCode;
+        window.myPlayerNum = 1;
+
+        listenToRoom(roomCode);
+        toggleModal('roomModal');
+        showToast("¡Sala creada! Comparte el código " + roomCode + " con tu amigo.");
+      } catch (err) {
+        console.error("Error creating room:", err);
+        showToast("Ocurrió un error al crear la sala.");
+      }
+    };
+
+    /* Join Online Game Room */
+    window.joinOnlineRoom = async function() {
+      const codeInput = document.getElementById('joinRoomCodeInput').value.trim();
+      if (!codeInput || codeInput.length < 4) {
+        showToast("Ingresa un código de sala válido.");
+        return;
+      }
+
+      try {
+        const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'diceRooms', codeInput);
+        const snapshot = await getDoc(roomRef);
+
+        if (!snapshot.exists()) {
+          showToast("La sala no existe. Verifica el código.");
+          return;
+        }
+
+        window.currentRoomCode = codeInput;
+        window.myPlayerNum = 2;
+
+        // Update player 2 name in room
+        await updateDoc(roomRef, {
+          'p2.name': window.players[2].name
+        });
+
+        listenToRoom(codeInput);
+        toggleModal('roomModal');
+        showToast("¡Te has unido con éxito a la sala " + codeInput + "!");
+      } catch (err) {
+        console.error("Error joining room:", err);
+        showToast("Error al intentar unirte a la sala.");
+      }
+    };
+
+    /* Listen to Real-time Room Sync */
+    function listenToRoom(code) {
+      if (window.unsubscribeRoomListener) {
+        window.unsubscribeRoomListener();
+      }
+
+      const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'diceRooms', code);
+
+      // UI Banner activation
+      document.getElementById('activeRoomBanner').classList.remove('hidden');
+      document.getElementById('currentRoomCode').textContent = code;
+      document.getElementById('roomStatusTag').innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Online (Sala #${code})`;
+      document.getElementById('roomBtnLabel').textContent = `Sala #${code}`;
+
+      let lastProcessedRollTime = null;
+
+      window.unsubscribeRoomListener = onSnapshot(roomRef, (snapshot) => {
+        if (!snapshot.exists()) return;
+
+        const data = snapshot.data();
+
+        window.players[1] = data.p1 || window.players[1];
+        window.players[2] = data.p2 || window.players[2];
+        window.activePlayer = data.activePlayer || 1;
+        window.roundCount = data.round || 1;
+        window.gameHistory = data.history || [];
+        if (data.customChallenges) {
+          window.customChallenges = data.customChallenges;
+        }
+
+        // Trigger dice animation on both phones when new roll occurs
+        if (data.lastRoll && data.lastRoll.time !== lastProcessedRollTime) {
+          lastProcessedRollTime = data.lastRoll.time;
+          window.isRolling = true;
+
+          trigger3DDiceAnimation(data.lastRoll.val1, data.lastRoll.val2, () => {
+            renderLastRollCard(data.lastRoll);
+            renderHistoryList();
+            window.isRolling = false;
+            updatePlayersUI();
+          });
+        } else {
+          if (data.lastRoll) renderLastRollCard(data.lastRoll);
+          renderHistoryList();
+          updatePlayersUI();
+        }
+      }, (err) => {
+        console.error("Error in room listener:", err);
+      });
+    }
+
+    /* Leave Online Room */
+    window.leaveRoom = function() {
+      if (window.unsubscribeRoomListener) {
+        window.unsubscribeRoomListener();
+        window.unsubscribeRoomListener = null;
+      }
+
+      window.currentRoomCode = null;
+      window.myPlayerNum = null;
+
+      document.getElementById('activeRoomBanner').classList.add('hidden');
+      document.getElementById('roomStatusTag').innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400"></span> Modo Local (Mismo teléfono)`;
+      document.getElementById('roomBtnLabel').textContent = "Conectar Teléfonos";
+
+      updatePlayersUI();
+      showToast("Has salido de la sala online.");
+    };
+
+    /* Render Custom Challenge List in Modal */
+    window.renderChallengesEditor = function() {
+      const container = document.getElementById('challengesEditorList');
+      let html = '';
+
+      for (let i = 2; i <= 12; i++) {
+        html += `
+          <div class="flex items-center gap-3 bg-slate-900/60 p-2.5 rounded-2xl border border-slate-800">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-pink-600 font-mono font-bold text-base flex items-center justify-center text-white shrink-0 shadow">
+              ${i}
+            </div>
+            <input type="text" id="challengeInput_${i}" value="${window.customChallenges[i]}" class="flex-grow px-3 py-2 rounded-xl glass-input text-xs sm:text-sm font-medium" placeholder="Escribe el reto para la suma ${i}">
+          </div>
+        `;
+      }
+
+      container.innerHTML = html;
+    };
+
+    /* Save Custom Challenges */
+    window.saveCustomChallenges = async function() {
+      for (let i = 2; i <= 12; i++) {
+        const input = document.getElementById(`challengeInput_${i}`);
+        if (input) {
+          window.customChallenges[i] = input.value.trim() || DEFAULT_CHALLENGES[i];
+        }
+      }
+
+      if (window.currentRoomCode) {
+        try {
+          const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'diceRooms', window.currentRoomCode);
+          await updateDoc(roomRef, {
+            customChallenges: window.customChallenges
+          });
+        } catch(e) {
+          console.error("Error syncing custom challenges:", e);
+        }
+      }
+
+      toggleModal('challengesModal');
+      showToast("Lista de retos actualizada.");
+    };
+
+    /* Restore Default Challenges */
+    window.restoreDefaultChallenges = function() {
+      window.customChallenges = { ...DEFAULT_CHALLENGES };
+      renderChallengesEditor();
+    };
+
+    /* Full Game Reset */
+    window.resetWholeGame = async function() {
+      if (confirm('¿Estás seguro de que deseas reiniciar la partida? Se borrará el historial de tiros.')) {
+        window.players[1].rolls = 0;
+        window.players[2].rolls = 0;
+        window.activePlayer = 1;
+        window.roundCount = 1;
+        window.gameHistory = [];
+
+        if (window.currentRoomCode) {
+          try {
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'diceRooms', window.currentRoomCode);
+            await updateDoc(roomRef, {
+              'p1.rolls': 0,
+              'p2.rolls': 0,
+              activePlayer: 1,
+              round: 1,
+              lastRoll: null,
+              history: []
+            });
+          } catch(e) {
+            console.error("Error resetting online room:", e);
+          }
+        }
+
+        updatePlayersUI();
+        renderHistoryList();
+
+        document.getElementById('lastRollContent').innerHTML = `
+          <p class="text-sm text-slate-400 italic">Los dados están listos. El jugador activo debe hacer clic en "¡Tirar Dados!".</p>
+        `;
+        document.getElementById('lastTime').textContent = 'Sin lanzamientos';
+
+        showToast("Partida reiniciada.");
+      }
+    };
+  </script>
+</body>
+</html>
